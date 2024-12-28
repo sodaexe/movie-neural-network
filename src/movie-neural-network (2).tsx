@@ -1,39 +1,10 @@
-import {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect} from 'react';
 import {Card, CardHeader, CardTitle, CardContent} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {Slider} from '@/components/ui/slider';
 import {Heart, Swords} from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
-
-type Movie = {
-  name: string;
-  action: number;
-  romance: number;
-  icon: string;
-};
-
-type Profile = {
-  name: string;
-  description: string;
-  weights1: number[][];
-  weights2: number[];
-  icon: string;
-};
-
-type TrainingData = {
-  iteration: number;
-  error: number;
-};
 
 const MovieNeuralNetwork = () => {
-  // État pour les entrées et les poids
   const [inputs, setInputs] = useState([0.5, 0.5]); // [action, romance]
   const [weights1, setWeights1] = useState([
     [0.6, -0.3],
@@ -42,11 +13,9 @@ const MovieNeuralNetwork = () => {
   const [weights2, setWeights2] = useState([0.7, 0.6]);
   const [hiddenLayer, setHiddenLayer] = useState([0, 0]);
   const [output, setOutput] = useState(0);
-  const [isTraining, setIsTraining] = useState(false);
-  const [trainingData, setTrainingData] = useState<TrainingData[]>([]);
-  const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
+  const [currentProfile, setCurrentProfile] = useState(null);
 
-  // Profils de spectateurs prédéfinis
+  // Profils de spectateurs recalibrés
   const viewerProfiles = [
     {
       name: "Fan d'Action",
@@ -82,130 +51,99 @@ const MovieNeuralNetwork = () => {
       name: 'Critique Exigeant',
       description: 'Demande un haut niveau dans les deux aspects',
       weights1: [
-        [1.0, -0.8], // Premier neurone : évalue principalement l'action
-        [-0.8, 1.0], // Second neurone : évalue principalement la romance
+        [0.9, 0.8],
+        [0.8, 0.9],
       ],
-      weights2: [1.0, 1.0],
+      weights2: [0.9, 0.9],
       icon: '🎭',
     },
   ];
 
-  // Exemples de films
   const movieExamples = [
-    {name: 'Fast & Furious', action: 0.9, romance: 0.2, icon: '🏎️'},
-    {name: 'Titanic', action: 0.3, romance: 0.9, icon: '🚢'},
-    {name: 'Mr. & Mrs. Smith', action: 0.7, romance: 0.7, icon: '🔫'},
-    {name: 'Notebook', action: 0.1, romance: 1.0, icon: '📓'},
-    {name: 'Die Hard', action: 1.0, romance: 0.1, icon: '💥'},
+    {
+      name: 'Fast & Furious',
+      action: 0.9,
+      romance: 0.2,
+      icon: '🏎️',
+      description: 'Action pure',
+    },
+    {
+      name: 'Titanic',
+      action: 0.3,
+      romance: 0.9,
+      icon: '🚢',
+      description: 'Romance classique',
+    },
+    {
+      name: 'Mr. & Mrs. Smith',
+      action: 0.7,
+      romance: 0.7,
+      icon: '🔫',
+      description: 'Équilibré',
+    },
+    {
+      name: 'Notebook',
+      action: 0.1,
+      romance: 1.0,
+      icon: '📓',
+      description: 'Romance pure',
+    },
+    {
+      name: 'Die Hard',
+      action: 1.0,
+      romance: 0.1,
+      icon: '💥',
+      description: 'Action pure',
+    },
   ];
 
-  const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+  const sigmoid = (x) => 1 / (1 + Math.exp(-x));
 
-  const forwardPass = useCallback(() => {
+  const forwardPass = () => {
     const hidden = weights1.map((neuronWeights) => {
       const sum = neuronWeights[0] * inputs[0] + neuronWeights[1] * inputs[1];
-      // Augmenter le facteur pour les valeurs négatives
       const factor = sum < 0 ? 5 : 3;
       return sigmoid(sum * factor);
     });
     setHiddenLayer(hidden);
 
     const outputSum = hidden[0] * weights2[0] + hidden[1] * weights2[1];
-    console.log('🪿 outputsum:', outputSum, hidden);
-    console.log('🧠', hidden[0], weights2[0], hidden[1], weights2[1]);
-
-    const factor = outputSum < 0 ? 5 : 3;
-    const outputValue = sigmoid(outputSum * factor);
+    const outputFactor = outputSum < 0 ? 5 : 3;
+    const outputValue = sigmoid(outputSum * outputFactor);
     setOutput(outputValue);
-  }, [inputs, weights1, weights2]);
+  };
 
-  const setMovieExample = (movie: Movie) => {
+  const setMovieExample = (movie) => {
     setInputs([movie.action, movie.romance]);
   };
 
-  const setProfile = (profile: Profile) => {
+  const setProfile = (profile) => {
     setCurrentProfile(profile);
     setWeights1(profile.weights1);
     setWeights2(profile.weights2);
   };
 
-  // Simulation d'apprentissage
-  const simulateTraining = () => {
-    setIsTraining(true);
-    setTrainingData([]);
-
-    let iteration = 0;
-    const trainingInterval = setInterval(() => {
-      if (iteration >= 20) {
-        clearInterval(trainingInterval);
-        setIsTraining(false);
-        return;
-      }
-
-      // Ajuster les poids de manière progressive vers l'objectif
-      const targetWeights1 = currentProfile!.weights1;
-      const targetWeights2 = currentProfile!.weights2;
-
-      setWeights1((prevWeights1) =>
-        prevWeights1.map((row, i) =>
-          row.map((w, j) => {
-            const target = targetWeights1[i][j];
-            return w + (target - w) * 0.1;
-          })
-        )
-      );
-
-      setWeights2((prevWeights2) =>
-        prevWeights2.map((w, i) => {
-          const target = targetWeights2[i];
-          return w + (target - w) * 0.1;
-        })
-      );
-
-      // Enregistrer les données d'apprentissage
-      setTrainingData((prev) => [
-        ...prev,
-        {
-          iteration,
-          error: Math.random() * 0.5 * Math.exp(-iteration / 10), // Simulation d'erreur décroissante
-        },
-      ]);
-
-      iteration++;
-    }, 200);
-  };
-
   useEffect(() => {
     forwardPass();
-  }, [inputs, weights1, weights2, forwardPass]);
+  }, [inputs, weights1, weights2]);
 
-  const getNeuronColor = (value: number) => {
+  const getNeuronColor = (value) => {
     const intensity = Math.floor(value * 255);
     return `rgb(${intensity}, ${intensity}, 255)`;
   };
 
-  const getRecommendationText = (score: number) => {
-    if (currentProfile?.name === 'Critique Exigeant') {
-      if (score > 0.8) return "Chef d'œuvre! 🏆";
-      if (score > 0.6) return 'Très bon film 👏';
-      if (score > 0.4) return 'Film correct 🤔';
-      if (score > 0.2) return 'Plutôt médiocre... 😕';
-      return 'À éviter... 👎';
-    } else {
-      if (score > 0.8) return 'Va adorer! 🤩';
-      if (score > 0.6) return 'Devrait bien aimer 😊';
-      if (score > 0.4) return 'Pourrait apprécier 🤔';
-      if (score > 0.2) return 'Risque de ne pas aimer 😕';
-      return "N'aimera probablement pas 😬";
-    }
+  const getRecommendationText = (score) => {
+    if (score > 0.8) return 'Va adorer! 🤩';
+    if (score > 0.6) return 'Devrait bien aimer 😊';
+    if (score > 0.4) return 'Pourrait apprécier 🤔';
+    if (score > 0.2) return 'Risque de ne pas aimer 😕';
+    return "N'aimera probablement pas 😬";
   };
 
   return (
     <Card className="w-full max-w-4xl">
       <CardHeader>
-        <CardTitle>
-          Prédiction - Goûts Cinématographiques avec Apprentissage
-        </CardTitle>
+        <CardTitle>Prédiction - Goûts Cinématographiques</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Profils de spectateurs */}
@@ -281,7 +219,7 @@ const MovieNeuralNetwork = () => {
         </div>
 
         {/* Visualisation du réseau */}
-        <div className="relative h-72 border rounded-lg p-4">
+        <div className="relative h-96 border rounded-lg p-4">
           {/* Couche d'entrée */}
           <div className="absolute left-10 top-1/2 transform -translate-y-1/2 space-y-8">
             {inputs.map((input, i) => (
@@ -377,45 +315,6 @@ const MovieNeuralNetwork = () => {
           )}
         </div>
 
-        {/* Contrôles d'apprentissage */}
-        {currentProfile && (
-          <div className="space-y-4">
-            <Button
-              onClick={simulateTraining}
-              disabled={isTraining}
-              className="w-full"
-            >
-              {isTraining
-                ? 'Apprentissage en cours...'
-                : "Simuler l'apprentissage"}
-            </Button>
-
-            {/* Graphique d'apprentissage */}
-            {trainingData.length > 0 && (
-              <div className="h-48 border rounded-lg p-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trainingData}>
-                    <XAxis
-                      dataKey="iteration"
-                      label={{value: 'Itérations', position: 'bottom'}}
-                    />
-                    <YAxis
-                      label={{value: 'Erreur', angle: -90, position: 'left'}}
-                    />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="error"
-                      stroke="#8884d8"
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Légende */}
         <div className="space-y-2 text-sm">
           <p>
@@ -426,8 +325,8 @@ const MovieNeuralNetwork = () => {
             forte
           </p>
           <p>
-            • L'apprentissage adapte progressivement les poids aux préférences
-            du profil
+            • Les neurones cachés représentent les préférences apprises pour
+            chaque genre
           </p>
         </div>
       </CardContent>
